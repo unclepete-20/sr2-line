@@ -27,25 +27,7 @@ def dword(dw):
     return dw  
 
 def color_select(r, g, b):
-    '''
-    Here we have the rgb spectrum transformed to byte code.
-    The order of the inputs are not the way is used to due to difference
-    in how Windows OS works with this type of data.
-    '''
-    r = abs(r)
-    g = abs(g)
-    b = abs(b)
-        
-        
-    try:
-        color = bytes([int(b * 255), int(g * 255), int(r * 255)])
-    except ValueError:
-        print("Input value is incorrect! Try again using numbers this time...")
-    else:
-        if r <= 1 and g <= 1 and b <= 1:
-            return color
-        else:
-            print("Input value out of range...")
+   return bytes([b, g, r]) 
 
 # Class of type Render that will nest every function that will create a BMP file from scratch. 
 
@@ -53,18 +35,20 @@ class Render(object):
     def __init__(self):
         self.width = 0
         self.height = 0
+        self.pixels = 0
+        self.clearColor = color_select(0, 0, 0)
+        self.viewport_x = 0 
+        self.viewport_y = 0
+        self.viewport_height = 0
+        self.viewport_width = 0
+        self.texture = None
+        
+        # Constants for BMP files
         self.FILE_SIZE = (54)
         self.PIXEL_COUNT = 3
         self.PLANE = 1
         self.BITS_PER_PIXEL = 24
         self.DIB_HEADER = 40
-        self.pixels = 0
-        self.clearColor = color_select(1, 1, 1)
-        self.currentColor = color_select(0, 0, 0)
-        self.viewport_x = 0 
-        self.viewport_y = 0
-        self.viewport_height = 0
-        self.viewport_width = 0
         
     '''
     --- SR1: POINTS
@@ -74,8 +58,8 @@ class Render(object):
         self.width = width
         self.height = height
         
-        self.framebuffer = [[self.clearColor for y in range(self.height)]
-                       for x in range(self.width)]
+        self.framebuffer = [[self.clearColor for x in range(self.width)]
+                       for y in range(self.height)]
         
     def glViewPort(self, x, y, width, height):
         self.viewport_x = x
@@ -84,10 +68,10 @@ class Render(object):
         self.viewport_height = height
     
     def glColor(self, r, g, b):
-        self.currentColor = color_select(r, g, b)
+        self.clearColor = color_select(r, g, b)
     
     def glClearColor(self, r, g, b):
-        self.currentColor = color_select(r, g, b)
+        self.clearColor = color_select(r, g, b)
         for x in range(self.viewport_x, self.viewport_x + self.viewport_width + 1):
             for y in range(self.viewport_y, self.viewport_y + self.viewport_height + 1):
                 self.glPoint(x, y)
@@ -110,10 +94,8 @@ class Render(object):
                 self.glPoint(x, y)
         
     def glPoint(self, x, y):
-        self.framebuffer[y][x] = self.currentColor
-    
-    def pointXY(self, x, y, r, g, b):
-        self.framebuffer[y][x] = color_select(r, g, b)
+        if(0 < x < self.width and 0 < y < self.height):
+            self.framebuffer[y][x] = self.clearColor
     
     
         
@@ -161,9 +143,9 @@ class Render(object):
 
         for x in range(x0, x1 + 1):
             if steep:
-                self.glPoint(x, y)
-            else:
                 self.glPoint(y, x)
+            else:
+                self.glPoint(x, y)
 
             offset += dy * 2
             if offset >= threshold:
@@ -172,14 +154,15 @@ class Render(object):
         
     
     def glFinish(self, filename):
-        with open(filename, 'wb') as file:
+        with open(filename, 'bw') as file:
             # Header
-            file.write(bytes('B'.encode('ascii')))
-            file.write(bytes('M'.encode('ascii')))
+            file.write(char('B'))
+            file.write(char('M'))
 
             # file size
             file.write(dword(self.FILE_SIZE + self.height * self.width * self.PIXEL_COUNT))
-            file.write(dword(0))
+            file.write(word(0))
+            file.write(word(0))
             file.write(dword(self.FILE_SIZE))
 
             # Info Header
@@ -194,9 +177,9 @@ class Render(object):
             file.write(dword(0))
             file.write(dword(0))
             file.write(dword(0))
-
+    
             # Color table
             for y in range(self.height):
                 for x in range(self.width):
-                    file.write(self.framebuffer[x][y])
+                    file.write(self.framebuffer[y][x])
             file.close()
